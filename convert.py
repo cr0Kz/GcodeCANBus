@@ -1,18 +1,19 @@
 import os
 import re
 from typing import List
+import argparse
 
 # Parameters Section
 # -------------------
 
 # Gearbox ratios for each motor
 gear_ratios: List[float] = [
-    0.5,
-    0.5,
-    1,
-    1,
-    1,
-    1,
+    13.5,
+    150,
+    150,
+    48,
+    67.82,
+    67.82
 ]  # Replace with your actual gearbox ratios
 
 # Direction inversion for each motor (True/False)
@@ -83,17 +84,23 @@ def convert_to_can_message(
     return can_id + "F5" + speed_hex + "02" + rel_position_hex
 
 
-def process_tap_files() -> None:
+def process_gcode_files(directory: str) -> None:
     """
-    Processes all .tap files in the script directory, converting them into .txt files containing CAN messages.
-    """
-    script_dir = os.path.dirname(os.path.abspath(__file__))
+    Processes all .gcode files in the script directory, converting them into .txt files containing CAN messages.
 
-    for filename in os.listdir(script_dir):
-        if filename.endswith(".tap"):
-            input_filename = os.path.join(script_dir, filename)
+    Args:
+        directory: The directory containing the .tap files to process.
+
+    Note:
+        The function reads each line from the .gcode file, extracts the motion parameters,
+        and converts them into CAN messages. The CAN messages are then written to a .txt file.
+    """
+
+    for filename in os.listdir(directory):
+        if filename.endswith(".gcode"):
+            input_filename = os.path.join(directory, filename)
             output_filename = os.path.join(
-                script_dir, os.path.splitext(filename)[0] + ".txt"
+                directory, os.path.splitext(filename)[0] + ".txt"
             )
 
             with open(input_filename, "r") as input_file, open(
@@ -137,4 +144,8 @@ def process_tap_files() -> None:
 
 
 if __name__ == "__main__":
-    process_tap_files()
+    parser = argparse.ArgumentParser(description='Convert gcode files to CAN messages.')
+    parser.add_argument('directory', type=str, help='Directory containing the gcode files to convert.')
+    args = parser.parse_args()
+
+    process_gcode_files(args.directory)
