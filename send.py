@@ -1,5 +1,6 @@
 import os
 import time
+import argparse
 from typing import List
 
 import can
@@ -65,7 +66,7 @@ def adjust_speeds_within_packet(messages: List[can.Message]) -> None:
         msg.data[4] = adjusted_speed & 0xFF
 
 
-def can_send_messages(bus: can.interface.Bus, messages: List[can.Message]) -> None:
+def can_send_messages(bus: can.interface.Bus, messages: List[can.Message], recv_timeout: int = 3) -> None:
     """
     Sends a list of CAN messages through a specified CAN bus and waits for responses.
 
@@ -85,10 +86,10 @@ def can_send_messages(bus: can.interface.Bus, messages: List[can.Message]) -> No
         print(
             f"Sent: arbitration_id=0x{msg.arbitration_id:X}, data=[{data_bytes}], is_extended_id=False"
         )
-    timeout = 0.5
+    timeout = recv_timeout
     start_time = time.time()
     while True:
-        received_msg = bus.recv(timeout=3)
+        received_msg = bus.recv(timeout=recv_timeout)
         if received_msg is not None:
             received_data_bytes = ", ".join(
                 [f"0x{byte:02X}" for byte in received_msg.data]
@@ -96,12 +97,12 @@ def can_send_messages(bus: can.interface.Bus, messages: List[can.Message]) -> No
             print(
                 f"Received: arbitration_id=0x{received_msg.arbitration_id:X}, data=[{received_data_bytes}], is_extended_id=False"
             )
-            if received_msg.arbitration_id in expected_responses:
+            if received_msg.data[1] in expected_responses:
                 received_responses.add(received_msg.arbitration_id)
         if received_responses == expected_responses:
             if all(
-                received_msg.data[0] == 2 if received_msg is not None else False
-                for received_msg in [bus.recv(timeout=0.1)] * len(expected_responses)
+                received_msg.data[1] == 2 if received_msg is not None else False
+                for received_msg in [bus.recv(timeout=recv_timeout)] * len(expected_responses)
             ):
                 print(
                     "Responses received for all expected motors with status 2. Moving to the next set of messages."
@@ -112,27 +113,58 @@ def can_send_messages(bus: can.interface.Bus, messages: List[can.Message]) -> No
             break
 
 
-def main() -> None:
-    """
-    Main function to read CAN messages from a .txt file, send them through a CAN bus, and adjust speeds within packets.
-    """
-    script_directory = os.path.dirname(os.path.abspath(__file__))
-    txt_files = [file for file in os.listdir(script_directory) if file.endswith(".txt")]
-    if not txt_files:
-        print("No .txt files found in the script directory.")
-        return
-    selected_file = txt_files[0]
-    file_path = os.path.join(script_directory, selected_file)
-    bus = can.interface.Bus(bustype="slcan", channel="/dev/ttyACM0", bitrate=500000)
-    with open(file_path, "r") as file:
-        lines = file.readlines()
-    message_sets = [lines[i : i + 6] for i in range(0, len(lines), 6)]
-    for message_set in message_sets:
-        messages = [parse_can_message(line.strip()) for line in message_set]
-        adjust_speeds_within_packet(messages)
-        can_send_messages(bus, messages)
-    bus.shutdown()
-
-
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Send CAN messages from a .can file through a CAN bus.")
+    parser.add_argument(
+        "-f",
+        "--file",
+        type=str,
+        help="The .can file containing CAN messages to send.",
+    )
+    parser.add_argument(
+        "-d",
+        "--device",
+        type=str,
+        default="/dev/ttyACM0",
+        help="The CAN bus device to send messages through.",
+    )
+    parser.add_argument(
+        "-i",
+        "--interface",
+        type=str,
+        default="slcan",
+        help="The type of CAN bus to use for sending messages.",
+    )
+    parser.add_argument(
+        "--bitrate",
+        type=int,
+        default=500000,
+        help="The bitrate of the CAN bus in bits per second.",
+    )
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=3,
+        help="The timeout value in seconds for waiting for responses.",
+    )
+    parser.add_argument(
+        "--virtual",
+        action="store_true",
+        help="Use a virtual CAN interface instead of a physical one."
+    )
+    args = parser.parse_args()
+    if args.file:
+        if args.virtual:
+            args.interface = "virtual"
+        with can.interface.Bus(interface=args.interface, channel=args.device, bitrate=args.bitrate) as bus:
+            with open(args.file, "r") as file:
+                lines = file.readlines()
+            # Split the lines into sets of 6 lines each representing a message
+            message_sets = [lines[i : i + 6] for i in range(0, len(lines), 6)]
+            # Parse each message set and send the messages
+            for message in message_sets:
+                messages = [parse_can_message(line.strip()) for line in message]
+                adjust_speeds_within_packet(messages)
+                can_send_messages(bus, messages, recv_timeout=args.timeout)
+    else:
+        print("Please specify a .can file to send messages from.")

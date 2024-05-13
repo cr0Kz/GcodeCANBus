@@ -36,15 +36,67 @@ gear_ratios = [0.5, 0.5, 1, 1, 1, 1]
 
 ### Convert G-code to CAN messages
 
-`convert.py` converts a G-code file in `.tap` format and creates a corresponding `.txt` file containing CAN messages.
+`convert.py` converts a G-code file in `.gcode` format and creates a corresponding `.can` file containing CAN messages.
+
+You can convert all gcode files in a folder by running the following command:
+
+```bash
+$ python convert.py -h
+usage: convert.py [-h] [-d DIRECTORY] [-f FILE] [-o OUTPUT]
+
+Convert gcode files to CAN messages.
+
+options:
+  -h, --help            show this help message and exit
+  -d DIRECTORY, --directory DIRECTORY
+                        Directory containing the gcode files to convert.
+  -f FILE, --file FILE  Single gcode file to convert.
+  -o OUTPUT, --output OUTPUT
+                        Output directory for the converted files.
+```
+
+#### Convert all files in a directory
+
+```bash
+python convert.py -d examples/ -o examples/can
+```
+
+#### Convert a single file
+
+```bash
+python convert.py -f examples/move_a.gcode -o examples/can
+```
 
 ### Send CAN messages
 
-`send.py` streams CAN messages to the Canable adapter. If you need to change the port, modify the following line in `send.py`:
+`send.py` streams CAN messages to the Canable adapter.
+
+```bash
+$ python send.py -h
+usage: send.py [-h] [-f FILE] [-d DEVICE] [-i INTERFACE] [--bitrate BITRATE] [--timeout TIMEOUT] [--virtual]
+
+Send CAN messages from a .can file through a CAN bus.
+
+options:
+  -h, --help            show this help message and exit
+  -f FILE, --file FILE  The .can file containing CAN messages to send.
+  -d DEVICE, --device DEVICE
+                        The CAN bus device to send messages through.
+  -i INTERFACE, --interface INTERFACE
+                        The type of CAN bus to use for sending messages.
+  --bitrate BITRATE     The bitrate of the CAN bus in bits per second.
+  --timeout TIMEOUT     The timeout value in seconds for waiting for responses.
+  --virtual             Use a virtual CAN interface instead of a physical one.
+```
+
+#### Send CAN messages
+
+You can send CAN messages to a physical or virtual CAN bus by running the following command:
 
 ```python
-bus = can.interface.Bus(bustype='slcan', channel='/dev/ttyACM0', bitrate=500000)
+python send.py -f examples/can/move_b.can -d /dev/tty.usbmodem --timeout 5
 ```
+
 ## GUI Application
 A GUI application is provided for easier control and interaction with the scripts. It includes features such as selecting ports, connecting/disconnecting, sending files, and displaying messages.
 

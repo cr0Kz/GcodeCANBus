@@ -4,7 +4,7 @@ from tkinter import ttk, filedialog
 import time
 import can
 import serial.tools.list_ports
-from convert import process_tap_files
+from convert import process_gcode_files
 from send import parse_can_message, adjust_speeds_within_packet, can_send_messages
 from ttkthemes import ThemedStyle
 import threading
@@ -123,22 +123,22 @@ def convert():
         update_message("Please select a file to convert.")
         return
 
-    output_filename = os.path.splitext(input_filename)[0] + ".txt"
+    output_filename = os.path.splitext(input_filename)[0] + ".can"
     try:
-        process_tap_files()
+        process_gcode_files()
         update_message(f"File converted successfully: {output_filename}")
     except Exception as e:
         update_message(f"Error converting file: {str(e)}")
 
 # Function to handle file selection for conversion
 def browse_convert_file():
-    filename = filedialog.askopenfilename(filetypes=[("G-code files", "*.tap")])
+    filename = filedialog.askopenfilename(filetypes=[("G-code files", "*.gcode")])
     convert_file_entry.delete(0, tk.END)
     convert_file_entry.insert(0, filename)
 
 # Function to handle file selection for sending
 def browse_send_file():
-    filename = filedialog.askopenfilename(filetypes=[("Text files", "*.txt")])
+    filename = filedialog.askopenfilename(filetypes=[("Text files", "*.can")])
     send_file_entry.delete(0, tk.END)
     send_file_entry.insert(0, filename)
 
